@@ -19,6 +19,7 @@ back in as the next step's gripper observation instead.
 import time
 
 import numpy as np
+from rclpy.event_handler import PublisherEventCallbacks
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import CompressedImage, Image, JointState
 from geometry_msgs.msg import PoseStamped, WrenchStamped
@@ -26,7 +27,9 @@ from std_msgs.msg import Float64MultiArray
 
 
 class RosBridge:
-    def __init__(self, node, cfg):
+    def __init__(self, node, cfg, on_action_matched=None):
+        """on_action_matched(info): called (from the node's executor) each time a subscriber on the
+        action topic is matched or unmatched; info is rclpy's MatchedInfo."""
         self._node = node
 
         self._joint = None
@@ -59,7 +62,10 @@ class RosBridge:
         node.create_subscription(PoseStamped, cfg.tcp_pose_topic, self._on_pose, 10)
         node.create_subscription(WrenchStamped, cfg.ft_sensor_topic, self._on_ft, 10)
 
-        self._action_pub = node.create_publisher(Float64MultiArray, cfg.action_topic, 10)
+        self._action_pub = node.create_publisher(
+            Float64MultiArray, cfg.action_topic, 10,
+            event_callbacks=PublisherEventCallbacks(matched=on_action_matched) if on_action_matched else None,
+        )
 
         log = node.get_logger()
         log.info("RosBridge topics:")

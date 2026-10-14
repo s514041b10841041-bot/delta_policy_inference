@@ -146,6 +146,15 @@ grasp is good. The bag is not in git; copy `bags/` over like the checkpoints.
    **IL**, Arm Sync Mode **Per Frame** or **Per Task**, *Publish Policy Observations* **off**).
    Use reduced speed limits, keep the e-stop within reach, and start the arm near where the
    demonstrations started.
+6. **Hand-off:** when the extension starts its IL step (after the coarse approach), the node logs
+   `IL hand-off #s1: new /il/grasp/action subscriber delta_extension_node` and resets the policy,
+   the fed-back gripper state and the gripper debounce. The node detects the IL step's subscription
+   itself, so this works with any delta_extension version, no extension change needed. If the line
+   doesn't appear when the fine approach starts, stop the run.
+   > **Known limit** (Per Frame check in Isaac Sim, 2026-10-14, extension as on origin/main): the
+   > extension handles one ROS message per frame across all its topics, so only ~11% of the actions
+   > reached the IL step (3.3 of 30 per second). The arm moves much slower than in the demos, and a
+   > short gripper close can be missed, so the step may never end by itself.
 
 ---
 
@@ -273,6 +282,7 @@ Run only **one** policy at a time. All of them publish on the same topic. Stop o
 | You see | Meaning / fix |
 |:--|:--|
 | `waiting for all observation topics...` / `no publisher found for ...` | one of the five input topics is missing. Start the robot or bag, and check `ROS_DOMAIN_ID` |
+| no `IL hand-off` line when the IL step starts | the extension's ROS node isn't named `delta_extension_node` (add its name to `handoff_subscriber_nodes` in `config/params.yaml`), or it is on another `ROS_DOMAIN_ID` |
 | `checkpoint '...' not found` | the folder isn't under `checkpoints/`; the message lists the ones that are there |
 | `could not select device driver "nvidia"` | NVIDIA Container Toolkit missing (install step 3) |
 | `permission denied ... docker.sock` | not in the `docker` group (install step 2, then log out and back in) |

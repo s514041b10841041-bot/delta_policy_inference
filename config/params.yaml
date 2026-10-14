@@ -53,6 +53,14 @@ policy_inference_node:
     # history) and the fed-back gripper state to initial_gripper_open. Override
     # at launch: `ros2 launch ... reset_on_handoff:=false`.
     reset_on_handoff: true
+    # Hand-off without any delta_extension change: the extension's IL grasp step subscribes to
+    # action_topic when it starts, so a NEW subscription from one of these nodes (name or prefix)
+    # is treated like a message on handoff_topic (read from the action publisher's matched event).
+    # Other subscribers (ros2 topic echo, monitors) are only logged. Signals closer together than
+    # handoff_dedupe_sec are one hand-off: an extension that also publishes on handoff_topic resets once.
+    handoff_on_subscriber: true
+    handoff_subscriber_nodes: ["delta_extension_node", "delta_il_sim_rollout_"]
+    handoff_dedupe_sec: 1.0
 
     # Grad-CAM: overlay of which image regions drive the predicted actions, published on
     # gradcam_topic (sensor_msgs/Image, rgb8; view with rqt_image_view). Runs on its own

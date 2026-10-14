@@ -15,6 +15,7 @@ policies/__init__.py's create_policy(), and select it via the policy_name
 parameter (config/params.yaml or `-p policy_name:=...`).
 """
 import json
+import time
 from dataclasses import dataclass
 
 import numpy as np
@@ -62,6 +63,15 @@ _DEFAULT_PARAMS = dict(
     # policy starts like a fresh episode instead of carrying over what it
     # predicted while the scripted approach was moving the arm.
     reset_on_handoff=True,
+    # Hand-off without any extension change: the extension's IL grasp step creates its subscription
+    # on action_topic when it starts (and destroys it when it ends), so a NEW subscription from one of
+    # these nodes (name or name prefix) counts as a hand-off, exactly like a message on handoff_topic.
+    # Detected from the action publisher's matched event, not by polling.
+    handoff_on_subscriber=True,
+    handoff_subscriber_nodes=["delta_extension_node", "delta_il_sim_rollout_"],
+    # Hand-off signals closer together than this are one hand-off (an extension that both creates its
+    # subscription and publishes on handoff_topic at the IL start): reset once, not twice.
+    handoff_dedupe_sec=1.0,
     # Grad-CAM (gradcam.py): which image regions drive the predicted actions, published as an
     # overlay image on gradcam_topic. Runs on its own thread at up to gradcam_rate_hz, so the
     # control loop never waits for it. Only for act, depth_act, diffusion*, depth_inference*.
@@ -94,6 +104,9 @@ class InferenceConfig:
     handoff_topic: str
     handoff_log_actions: int
     reset_on_handoff: bool
+    handoff_on_subscriber: bool
+    handoff_subscriber_nodes: list
+    handoff_dedupe_sec: float
     gradcam_enable: bool
     gradcam_rate_hz: float
     gradcam_target: str
@@ -110,7 +123,16 @@ class PolicyInferenceNode(Node):
         self._ee_pos_offset = np.array(cfg.ee_pos_offset, dtype=np.float64)
         self._ee_rot_offset = Rotation.from_quat(cfg.ee_rot_offset_xyzw)
 
-        self.bridge = RosBridge(self, cfg)
+        # Subscriber-triggered hand-off state (see _on_action_matched); set before RosBridge creates
+        # the action publisher, whose matched event may fire as soon as the node spins.
+        self._handoff_pending = None
+        self._handoff_last = None           # (id, monotonic time) of the last hand-off queued
+        self._sub_handoff_count = 0
+        self._known_action_subs = {}        # endpoint gid -> node name, every subscriber seen so far
+        self._match_confirm_timer = None
+        self._match_confirm_deadline = 0.0
+        self.bridge = RosBridge(
+            self, cfg, on_action_matched=self._on_action_matched if cfg.handoff_on_subscriber else None)
         self.policy = policy if policy is not None else create_policy(cfg.policy_name, cfg.checkpoint)
         self.policy.reset()
 
@@ -141,9 +163,13 @@ class PolicyInferenceNode(Node):
         except Exception as e:  # diagnostics only, never block inference
             self.get_logger().warn(f"could not read the checkpoint's state range: {e}")
             self._state_range = None
-        self._handoff_pending = None
         self._handoff = None
         self.create_subscription(Int32, cfg.handoff_topic, self._on_handoff, 10)
+        if cfg.handoff_on_subscriber:
+            self.get_logger().info(
+                f"hand-off on subscriber: a new {cfg.action_topic} subscription from "
+                f"{', '.join(cfg.handoff_subscriber_nodes)}* starts an IL hand-off"
+            )
 
         self.gradcam = self._start_gradcam() if cfg.gradcam_enable else None
 
@@ -241,19 +267,80 @@ class PolicyInferenceNode(Node):
 
     def _on_handoff(self, msg):
         """The sim's IL grasp step started; acted on at the start of the next tick."""
-        self._handoff_pending = msg.data
+        self._queue_handoff(msg.data, f"message on {self.cfg.handoff_topic}")
+
+    def _on_action_matched(self, info):
+        """Matched event of the action publisher: a subscriber appeared or went away. Look up which
+        node it belongs to; the graph can learn the node name a little after the DDS match (more so
+        across DDS vendors), so if a new subscriber isn't visible yet, re-check every 50 ms for up
+        to 2 s. That timer only exists after an event and is destroyed once the check is done."""
+        self.get_logger().info(
+            f"{self.cfg.action_topic}: subscriber {'matched' if info.current_count_change > 0 else 'unmatched'} "
+            f"(now {info.current_count})"
+        )
+        if info.current_count_change > 0:
+            self._match_confirm_deadline = time.monotonic() + 2.0
+        if self._check_action_subscribers() or info.current_count_change <= 0:
+            return
+        if self._match_confirm_timer is None:
+            self._match_confirm_timer = self.create_timer(0.05, self._on_match_confirm)
+
+    def _on_match_confirm(self):
+        found = self._check_action_subscribers()
+        if found or time.monotonic() > self._match_confirm_deadline:
+            if not found:
+                self.get_logger().warn(
+                    f"{self.cfg.action_topic}: a subscriber matched but its node did not appear in the ROS "
+                    "graph within 2 s; NOT treated as an IL hand-off"
+                )
+            self.destroy_timer(self._match_confirm_timer)
+            self._match_confirm_timer = None
+
+    def _check_action_subscribers(self):
+        """Compare the action topic's subscribers with the ones already seen. A new one from a
+        handoff_subscriber_nodes node queues a hand-off; others are only logged. Returns True if
+        any new subscriber was found."""
+        current = {
+            bytes(i.endpoint_gid): i.node_name
+            for i in self.get_subscriptions_info_by_topic(self.cfg.action_topic)
+        }
+        new = {gid: name for gid, name in current.items() if gid not in self._known_action_subs}
+        self._known_action_subs = current
+        for name in new.values():
+            if any(name.startswith(n) for n in self.cfg.handoff_subscriber_nodes):
+                self._sub_handoff_count += 1
+                self._queue_handoff(f"s{self._sub_handoff_count}", f"new {self.cfg.action_topic} subscriber {name}")
+            else:
+                self.get_logger().info(
+                    f"{self.cfg.action_topic}: new subscriber {name} is not in handoff_subscriber_nodes; "
+                    "not an IL hand-off"
+                )
+        return bool(new)
+
+    def _queue_handoff(self, handoff_id, source):
+        """Queue a hand-off for the next tick, unless another one was queued within
+        handoff_dedupe_sec: then it is the same hand-off, signalled twice."""
+        now = time.monotonic()
+        if self._handoff_last is not None and now - self._handoff_last[1] < self.cfg.handoff_dedupe_sec:
+            self.get_logger().info(
+                f"IL hand-off #{handoff_id} ({source}) came {1000 * (now - self._handoff_last[1]):.0f} ms after "
+                f"#{self._handoff_last[0]}: same hand-off, not reset again"
+            )
+            return
+        self._handoff_last = (handoff_id, now)
+        self._handoff_pending = (handoff_id, source)
 
     def _start_handoff_if_pending(self):
         if self._handoff_pending is None:
             return
-        handoff_id, self._handoff_pending = self._handoff_pending, None
+        (handoff_id, source), self._handoff_pending = self._handoff_pending, None
         self._handoff = {
             "id": handoff_id,
             "gripper_state_before": self._gripper_state,
             "actions_left": self.cfg.handoff_log_actions,
         }
         self.get_logger().info(
-            f"IL hand-off #{handoff_id}: received; policy._gripper_state at this tick = {self._gripper_state:.0f}"
+            f"IL hand-off #{handoff_id}: {source}; policy._gripper_state at this tick = {self._gripper_state:.0f}"
         )
         if self.cfg.reset_on_handoff:
             self.policy.reset()
