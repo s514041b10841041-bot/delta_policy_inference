@@ -1,0 +1,26 @@
+# Which checkpoint to load and LiteFlow-specific inference knobs. Not a ROS param file (this
+# policy is loaded in-process by liteflow_policy.py, not launched as its own node) so it can be
+# edited without touching config/params.yaml or the launch file.
+
+# Mounted read-only from the host (docker-compose.yml's checkpoints volume). fetch_weights.sh
+# downloads a version from the GitLab Package Registry into this path.
+checkpoint_dir: /checkpoints/liteflow/step_20000_ema
+
+# Offline InternVL3-1B snapshot. trust_remote_code's AutoModel.from_pretrained needs this
+# present to build the module tree even though none of its weights survive the checkpoint load
+# (see liteflow_delta_deploy/README_FIRST.md). Also fetched by fetch_weights.sh.
+hf_home: /checkpoints/liteflow/hf_cache
+
+# Flow-matching Euler steps. 4 matches FLOWER and is what this repo's benchmarks use; the
+# checkpoint's own default (50) is ~10x slower for the same trained weights.
+infer_steps: 4
+
+# Re-query the model after this many popped rows, even if the last query's 10-row chunk (~1s)
+# has rows left -- caps how long the arm runs open-loop on a stale observation. Smaller = more
+# reactive but more model queries; larger = fewer queries but blinder in between. Tune on the
+# actual GPU (see the bundle's self-test) before trusting this default on the real arm.
+n_exec: 5
+
+prompt: "grasp the fan"
+arm_key: rs_m90e7a_ee_delta
+dataset_key: grasp_fan_0909_0914

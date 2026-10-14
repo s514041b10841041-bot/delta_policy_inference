@@ -1,0 +1,13 @@
+# ACT trained on the wrist RGB image + the wrist depth image (Robot_Friday data/lerobot_data_depth,
+# checkpoints/checkpoint_act_depth, same training settings as the RGB-only ACT). Same rate, warm-up
+# and chunking / temporal ensembling as policies/act/config.yaml (used by act_depth_policy.py);
+# this file only adds the checkpoint and the depth encoding.
+
+# The run's 375000/pretrained_model/ plus data/lerobot_data_depth/meta/depth_encoding.json.
+checkpoint_dir: /checkpoints/act_depth/checkpoint_act_375
+
+# Must equal the dataset's meta/depth_encoding.json (depth_min_m / depth_max_m): depth in
+# [depth_min_m, depth_max_m] maps linearly to 255 (near) ... 1 (far), farther is clipped to 1, and
+# 0 means no reading. Any other values feed the policy depth it never saw in training.
+depth_min_m: 0.0
+depth_max_m: 1.0

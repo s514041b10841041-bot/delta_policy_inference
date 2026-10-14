@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1140" viewBox="0 0 1440 1140" role="img" aria-labelledby="title desc">
+  <title id="title">ROS 2 Policy Inference — Docker architecture</title>
+  <desc id="desc">Shared source code and checkpoints are mounted into isolated policy runtime containers. Both runtimes use the same ROS 2 interface. Icons identify source code, weights, containers, dependencies, networking, and robot hardware.</desc>
+  <defs>
+    <style>
+      text { font-family: Inter, Arial, Helvetica, sans-serif; }
+      .title { font-size: 36px; font-weight: 700; fill: #172B44; }
+      .heading { font-size: 27px; font-weight: 700; fill: #172B44; }
+      .body { font-size: 23px; fill: #42566E; }
+      .small { font-size: 21px; fill: #52667C; }
+      .label { font-size: 21px; font-weight: 700; letter-spacing: 1px; }
+      .mono { font-family: ui-monospace, Consolas, monospace; font-size: 22px; }
+      .icon { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9 Z" fill="#8293A8"/>
+    </marker>
+
+    <!-- Reusable, consistent line icons -->
+    <symbol id="i-folder" viewBox="0 0 24 24">
+      <path class="icon" d="M3 7V5h6l3 3h9v12H3Z"/>
+      <path class="icon" d="m9 12-3 3 3 3m6-6 3 3-3 3"/>
+    </symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24">
+      <rect class="icon" x="5" y="5" width="14" height="14" rx="3"/>
+      <rect class="icon" x="9" y="9" width="6" height="6" rx="1"/>
+      <path class="icon" d="M9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3M19 9h3m-3 6h3"/>
+    </symbol>
+    <symbol id="i-container" viewBox="0 0 24 24">
+      <rect class="icon" x="2" y="5" width="20" height="14" rx="2"/>
+      <path class="icon" d="M6 9v6m4-6v6m4-6v6m4-6v6M5 19v2m14-2v2"/>
+    </symbol>
+    <symbol id="i-package" viewBox="0 0 24 24">
+      <path class="icon" d="m12 2 9 5v10l-9 5-9-5V7Zm-9 5 9 5 9-5M12 12v10M7.5 4.5l9 5"/>
+    </symbol>
+    <symbol id="i-network" viewBox="0 0 24 24">
+      <rect class="icon" x="8" y="2" width="8" height="6" rx="1"/>
+      <rect class="icon" x="2" y="16" width="7" height="6" rx="1"/>
+      <rect class="icon" x="15" y="16" width="7" height="6" rx="1"/>
+      <path class="icon" d="M12 8v4H5.5v4M12 12h6.5v4"/>
+    </symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24">
+      <path class="icon" d="M3 7h4l2-3h6l2 3h4v13H3Z"/>
+      <circle class="icon" cx="12" cy="13" r="4"/>
+    </symbol>
+    <symbol id="i-action" viewBox="0 0 24 24">
+      <path class="icon" d="M4 19V5m0 14h15M4 19 18 5m-6 0h6v6"/>
+    </symbol>
+    <symbol id="i-robot" viewBox="0 0 24 24">
+      <path class="icon" d="M3 22h15M6 22v-5h8v5M9 14 5 8m4-3 7 4m3 3 2 3-2 3m2-3h2"/>
+      <circle class="icon" cx="7" cy="6" r="3"/>
+      <circle class="icon" cx="10" cy="15" r="2"/>
+      <circle class="icon" cx="18" cy="10" r="2"/>
+    </symbol>
+    <symbol id="i-mount" viewBox="0 0 24 24">
+      <path class="icon" d="M12 2v12m-4-4 4 4 4-4M4 14v7h16v-7"/>
+    </symbol>
+    <symbol id="i-warning" viewBox="0 0 24 24">
+      <path class="icon" d="m12 3 10 18H2Z"/>
+      <path class="icon" d="M12 9v5m0 3v.1"/>
+    </symbol>
+  </defs>
+
+  <rect width="1440" height="1140" fill="#F5F7FB"/>
+
+  <!-- Title -->
+  <rect x="64" y="30" width="64" height="64" rx="18" fill="#172B44"/>
+  <use href="#i-robot" x="78" y="43" width="36" height="36" color="#FFFFFF"/>
+  <text x="148" y="66" class="title">ROS 2 Policy Inference</text>
+  <text x="148" y="103" class="body">Separate dependencies. Shared code, weights, and ROS 2 interface.</text>
+  <rect x="1120" y="38" width="256" height="44" rx="22" fill="#E7ECF3"/>
+  <text x="1248" y="66" text-anchor="middle" font-size="18" font-weight="700" fill="#52667C" letter-spacing="1">DOCKER ARCHITECTURE</text>
+
+  <!-- Shared resources -->
+  <rect x="64" y="140" width="1312" height="172" rx="20" fill="#FFFFFF" stroke="#DCE3EC" stroke-width="2"/>
+  <text x="90" y="178" class="label" fill="#52667C">01 / SHARED HOST RESOURCES</text>
+  <use href="#i-mount" x="927" y="156" width="26" height="26" color="#60758E"/>
+  <text x="965" y="177" class="small">Mounted · Not baked into images</text>
+
+  <rect x="88" y="199" width="618" height="89" rx="14" fill="#F0F4F8"/>
+  <rect x="104" y="215" width="56" height="56" rx="14" fill="#E0E8F1"/>
+  <use href="#i-folder" x="116" y="227" width="32" height="32" color="#526D8B"/>
+  <text x="177" y="235" class="heading">Source code</text>
+  <text x="177" y="266" class="small">ros2_policy_inference/ · Rebuilt at startup</text>
+
+  <rect x="722" y="199" width="630" height="89" rx="14" fill="#F0F4F8"/>
+  <rect x="738" y="215" width="56" height="56" rx="14" fill="#E0E8F1"/>
+  <use href="#i-chip" x="750" y="227" width="32" height="32" color="#526D8B"/>
+  <text x="811" y="235" class="heading">Model weights</text>
+  <text x="811" y="266" class="small">checkpoints/ · Shared mounted storage</text>
+
+  <!-- Common fan-out -->
+  <path d="M720 312V335M392 335H1048M392 335V369M1048 335V369" fill="none" stroke="#8293A8" stroke-width="2.5"/>
+  <path d="M392 355V369M1048 355V369" fill="none" stroke="#8293A8" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <circle cx="720" cy="335" r="5" fill="#8293A8"/>
+
+  <!-- Runtime A -->
+  <rect x="64" y="380" width="636" height="316" rx="20" fill="#FFFFFF" stroke="#BDD3F2" stroke-width="2"/>
+  <path d="M84 380H680Q700 380 700 400V451H64V400Q64 380 84 380Z" fill="#EAF2FF"/>
+  <use href="#i-container" x="89" y="400" width="32" height="32" color="#245FC0"/>
+  <text x="136" y="425" class="label" fill="#245FC0">02 / RUNTIME A</text>
+  <text x="674" y="425" text-anchor="end" class="small">From image A</text>
+
+  <text x="90" y="494" class="mono" fill="#245FC0" font-weight="700">lerobot_ros2:latest</text>
+  <rect x="90" y="513" width="584" height="56" rx="12" fill="#245FC0"/>
+  <text x="382" y="549" text-anchor="middle" font-size="25" font-weight="700" fill="#FFFFFF">Policy: act / pi / dummy</text>
+
+  <use href="#i-package" x="91" y="586" width="26" height="26" color="#6480A2"/>
+  <text x="129" y="607" class="small">Isolated Python environment</text>
+  <rect x="90" y="625" width="239" height="44" rx="10" fill="#EDF3FD"/>
+  <text x="209" y="654" text-anchor="middle" font-size="22" fill="#245FC0">torch · CUDA 12.1</text>
+  <rect x="341" y="625" width="149" height="44" rx="10" fill="#EDF3FD"/>
+  <text x="415" y="654" text-anchor="middle" font-size="22" fill="#245FC0">lerobot</text>
+  <rect x="502" y="625" width="172" height="44" rx="10" fill="#EDF3FD"/>
+  <text x="588" y="654" text-anchor="middle" font-size="22" fill="#245FC0">scipy</text>
+
+  <!-- Runtime B -->
+  <rect x="724" y="380" width="652" height="316" rx="20" fill="#FFFFFF" stroke="#E8CFB3" stroke-width="2"/>
+  <path d="M744 380H1356Q1376 380 1376 400V451H724V400Q724 380 744 380Z" fill="#FFF3E6"/>
+  <use href="#i-container" x="749" y="400" width="32" height="32" color="#A45C18"/>
+  <text x="796" y="425" class="label" fill="#A45C18">02 / RUNTIME B</text>
+  <rect x="1228" y="398" width="122" height="35" rx="17" fill="#F7DFC4"/>
+  <text x="1289" y="422" text-anchor="middle" font-size="19" font-weight="700" fill="#985417">EXAMPLE</text>
+
+  <text x="750" y="494" class="mono" fill="#A45C18" font-weight="700">diffusionpolicy_ros2:latest</text>
+  <rect x="750" y="513" width="600" height="56" rx="12" fill="#AC621F"/>
+  <text x="1050" y="549" text-anchor="middle" font-size="25" font-weight="700" fill="#FFFFFF">Policy: diffusion</text>
+
+  <use href="#i-package" x="751" y="586" width="26" height="26" color="#A57950"/>
+  <text x="789" y="607" class="small">Own pinned dependencies · Example versions</text>
+  <rect x="750" y="625" width="313" height="44" rx="10" fill="#FFF3E6"/>
+  <text x="906" y="654" text-anchor="middle" font-size="21" fill="#985417">torch 2.8.0 · CUDA 12.8</text>
+  <rect x="1075" y="625" width="275" height="44" rx="10" fill="#FFF3E6"/>
+  <text x="1212" y="654" text-anchor="middle" font-size="21" fill="#985417">diffusion_policy + scipy</text>
+
+  <!-- Reason for isolation -->
+  <rect x="64" y="716" width="1312" height="54" rx="12" fill="#FFF1ED"/>
+  <use href="#i-warning" x="84" y="729" width="28" height="28" color="#BA6547"/>
+  <text x="128" y="751" font-size="23" fill="#924D35">Why separate images? Algorithms may require incompatible Python package versions.</text>
+
+  <!-- ROS connections -->
+  <path d="M64 659H39V850H64" fill="none" stroke="#8293A8" stroke-width="2.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <path d="M1376 659H1401V850H1376" fill="none" stroke="#8293A8" stroke-width="2.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+
+  <!-- Shared ROS graph -->
+  <rect x="64" y="797" width="1312" height="174" rx="20" fill="#F0EDF9" stroke="#D4CCE8" stroke-width="2"/>
+  <use href="#i-network" x="89" y="816" width="32" height="32" color="#7151A3"/>
+  <text x="136" y="841" class="label" fill="#7151A3">03 / SHARED ROS 2 GRAPH</text>
+  <text x="1350" y="841" text-anchor="end" class="small">Same topic interface for either environment</text>
+
+  <text x="720" y="884" text-anchor="middle" font-size="25" font-weight="700" fill="#64438E">Host networking · ROS_DOMAIN_ID=0 · CycloneDDS</text>
+
+  <rect x="90" y="904" width="609" height="46" rx="10" fill="#FFFFFF"/>
+  <use href="#i-camera" x="109" y="914" width="26" height="26" color="#7151A3"/>
+  <text x="152" y="934" font-size="22" fill="#64438E">IN: Camera + robot observations</text>
+
+  <rect x="721" y="904" width="629" height="46" rx="10" fill="#FFFFFF"/>
+  <use href="#i-action" x="740" y="914" width="26" height="26" color="#7151A3"/>
+  <text x="783" y="934" font-size="22" fill="#64438E">OUT: /il/grasp/action</text>
+
+</svg>

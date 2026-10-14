@@ -1,0 +1,38 @@
+# Which checkpoint to load and ACT-specific inference knobs. Not a ROS param file (this policy is
+# loaded in-process by act_policy.py, not launched as its own node), same as
+# policies/diffusion/config.yaml.
+
+# Mounted read-only from the host (docker-compose.yml's checkpoints volume): the lerobot
+# checkpoint directory holding config.json, model.safetensors and the pre/post-processors.
+# Copy the trained run's checkpoints/checkpoint_act/375000/pretrained_model/ folder to
+# <repo>/checkpoints/act/checkpoint_act_375.
+checkpoint_dir: /checkpoints/act/checkpoint_act_375
+
+device: cuda
+
+# Carried through the processor pipeline for parity with training batches; ACT itself does not
+# condition on language.
+task: "pick up the fan by its handle"
+
+# Overrides config/params.yaml's inference_rate_hz while this policy runs. Each action is the
+# motion recorded between two consecutive camera frames of the training data (labelled fps=30),
+# so ticking at any other rate scales the arm's speed by the same factor.
+inference_rate_hz: 30.0
+
+# How many of each predicted 50-action chunk are executed before predicting again. null = the
+# checkpoint's value (10, i.e. re-predict every 0.33 s at 30 Hz). Actions are per-step deltas, so
+# error accumulates over the open-loop part; smaller re-grounds more often at one model call per
+# n_action_steps ticks. Must be between 1 and the checkpoint's chunk_size (50).
+n_action_steps: null
+
+# Temporal ensembling (ACT paper, Algorithm 2): run the model every tick and average the
+# overlapping chunk predictions with weights exp(-coeff * i). null = off (plain chunking above).
+# Setting it forces n_action_steps to 1 (the n_action_steps value above is then ignored), so every
+# tick pays one model call: measured ~3.8 ms on an RTX 4070 Ti SUPER, well inside the 33 ms period.
+# On because the actions are per-step deltas: re-planning from a fresh frame every tick limits the
+# drift that builds up over open-loop chunk execution. 0.01 is the ACT paper's value.
+temporal_ensemble_coeff: 0.01
+
+# Dummy inferences at startup to pay the first-call cost (CUDA context, cuDNN autotune) before the
+# robot moves.
+warmup_iters: 3

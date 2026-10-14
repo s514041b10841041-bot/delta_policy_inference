@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Model weights (mounted into the container at /checkpoints, see docker/docker-compose.yml)
+checkpoints/
+
+# Recorded ROS 2 bags used for offline testing (multi-GB)
+bags/
+

@@ -1,0 +1,17 @@
+# Diffusion Policy trained on the wrist RGB image + the wrist depth image (Robot_Friday
+# data/lerobot_data_depth, checkpoints/checkpoint_diffusion_depth/375000). Same backend, rate,
+# warm-up and RTC settings as policies/diffusion/config.yaml (used by diffusion_depth_policy.py);
+# this file only adds the checkpoint and the depth encoding.
+
+# Two checkpoints of the RGB + depth training run (Robot_Friday checkpoints/checkpoint_diffusion_depth),
+# each the run's <step>/pretrained_model/ plus data/lerobot_data_depth/meta/depth_encoding.json:
+#   checkpoint_diffusion_375  step 375k, the final one
+#   checkpoint_diffusion_50   step 50k: lower validation loss on the 10 held-out episodes (0.072 vs 0.123)
+checkpoint_dir: /checkpoints/diffusion_depth/checkpoint_diffusion_375
+# checkpoint_dir: /checkpoints/diffusion_depth/checkpoint_diffusion_50
+
+# Must equal the dataset's meta/depth_encoding.json (depth_min_m / depth_max_m): depth in
+# [depth_min_m, depth_max_m] maps linearly to 255 (near) ... 1 (far), farther is clipped to 1, and
+# 0 means no reading. Any other values feed the policy depth it never saw in training.
+depth_min_m: 0.0
+depth_max_m: 1.0

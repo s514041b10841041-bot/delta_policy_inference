@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1
+#
+# Environment-only image for the LiteFlow policy (policies/liteflow/) — ROS2 Jazzy + the
+# InternVL3/FLOWER stack, pinned to what the liteflow_delta_deploy bundle was trained and
+# tested with. Separate from the main Dockerfile/lerobot_ros2 image because LiteFlow hard-pins
+# transformers==4.39.0 (InternVL3-1B's trust_remote_code modeling code does not survive other
+# versions), which would otherwise collide with lerobot's own dependency set.
+#
+# No application code is baked in: code lives in this repo (GitLab-managed) and is mounted into
+# the container at runtime, same as the main Dockerfile. entrypoint.sh colcon-builds whatever's
+# currently mounted every time the container starts.
+#
+#   docker build -f docker/Dockerfile.liteflow -t liteflow_ros2:latest .   # run from repo root
+#   ./ros2_policy_inference/policies/liteflow/fetch_weights.sh   # populate ./checkpoints/liteflow/ first
+#   docker compose -f docker/docker-compose.yml run --rm policy-inference-liteflow
+
+FROM ros:jazzy-ros-base
+SHELL ["/bin/bash", "-c"]
+
+# Match to whatever CUDA build your host's NVIDIA driver supports. cu128 is what the checkpoint
+# was trained with (liteflow_delta_deploy/README_FIRST.md section 1).
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-pip \
+        python3-venv \
+        python3-colcon-common-extensions \
+        ffmpeg \
+        git \
+        build-essential \
+        libgl1 \
+        libglib2.0-0 \
+        ros-jazzy-rmw-cyclonedds-cpp \
+    && rm -rf /var/lib/apt/lists/*
+
+# See Dockerfile for why (Fast-DDS's same-host SHM transport breaks here).
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+# See Dockerfile for why this needs a --system-site-packages venv (PEP 668 + apt/pip conflicts).
+RUN python3 -m venv --system-site-packages /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+# torch 2.8.0 / torchvision 0.23.0 first, matching the checkpoint's training build, so the
+# requirements below see it already satisfied instead of pulling in a different version.
+RUN pip install --no-cache-dir \
+    --extra-index-url ${TORCH_INDEX_URL} torch==2.8.0 torchvision==0.23.0
+
+COPY ros2_policy_inference/policies/liteflow/requirements.txt /tmp/liteflow-requirements.txt
+RUN pip install --no-cache-dir -r /tmp/liteflow-requirements.txt \
+    # scipy is used by inference_node.py itself (not liteflow-specific), same as in Dockerfile.
+    && pip install --no-cache-dir scipy
+
+# See Dockerfile for why colcon itself (not just the packages above) needs to live in the venv:
+# apt's colcon runs under the system python and writes executable shebangs accordingly, making
+# everything just pip-installed invisible at runtime.
+RUN pip install --no-cache-dir --force-reinstall --no-deps colcon-core
+
+WORKDIR /workspace
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["ros2", "launch", "ros2_policy_inference", "inference.launch.py", "policy_name:=liteflow"]

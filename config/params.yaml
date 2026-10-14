@@ -1,0 +1,70 @@
+policy_inference_node:
+  ros__parameters:
+    # Subscribe to these topics for the policy input
+    joint_state_topic: "/left_arm/joint_states"
+    rgb_topic: "/camera_L/color/image_raw/compressed"
+    depth_topic: "/camera_L/depth/aligned_depth_to_color"
+    tcp_pose_topic: "/left_arm/tcp_pose_world"
+    ft_sensor_topic: "/left_ft/wrench_compensated"
+
+    # Topic to publish the predicted action to.
+    action_topic: "/il/grasp/action"
+
+    # Which policies/*.py implementation to run
+    policy_name: "dummy"
+
+    # Checkpoint for act / depth_act / diffusion* / depth_inference*: "" = the one in the policy's
+    # config.yaml; otherwise a folder name, e.g. diffusion_50k or checkpoint_diffusion_50.
+    # Override at launch: `ros2 launch ... checkpoint:=diffusion_50k`.
+    checkpoint: ""
+
+    # How often the policy runs (Hz). Independent of camera/topic rates —
+    # each tick uses whatever the latest message on every topic is.
+    inference_rate_hz: 10.0
+
+    # How long (seconds) a subscribed topic may go without a message before
+    # a warning is logged (no publisher / no data yet / went stale).
+    topic_timeout_sec: 2.0
+
+    # Camera images are resized to image_size x image_size before being fed
+    # to the policy (same size the training data was recorded at).
+    image_size: 256
+
+    # Link_6 -> TCP offset
+    ee_pos_offset: [0.0, 0.0, 0.2204]
+    ee_rot_offset_xyzw: [0.70711, 0.0, 0.70711, 0.0]
+
+    # Gripper setting
+    initial_gripper_open: true
+    gripper_open_threshold: 0.5
+    # Publish a gripper close only after this many consecutive ticks predict one (below
+    # gripper_open_threshold); until then the open value is published and fed back. Filters the
+    # stray closes that end the IL grasp step early: diffusion_rtc's come in runs of up to 8 ticks
+    # (claude_utility/replay_results, 100k checkpoint). 1 = off (publish every raw close).
+    gripper_debounce_ticks: 8
+
+    # IL hand-off: the sim (delta_extension) publishes on this topic when its
+    # IL grasp step starts. The node then logs the state it gives the policy
+    # (raw and against the checkpoint's training range) and the next
+    # handoff_log_actions actions.
+    handoff_topic: "/il/grasp/handoff"
+    handoff_log_actions: 10
+    # At a hand-off, also reset the policy (action queue / chunks, observation
+    # history) and the fed-back gripper state to initial_gripper_open. Override
+    # at launch: `ros2 launch ... reset_on_handoff:=false`.
+    reset_on_handoff: true
+
+    # Grad-CAM: overlay of which image regions drive the predicted actions, published on
+    # gradcam_topic (sensor_msgs/Image, rgb8; view with rqt_image_view). Runs on its own
+    # thread, so the control loop never waits for it; act / depth_act / diffusion* /
+    # depth_inference* only. Enable at launch: `ros2 launch ... gradcam_enable:=true`, or
+    # ./run_docker.sh --gradcam. Cost per map on an RTX 4070 Ti SUPER: ACT ~10 ms, diffusion ~100 ms.
+    gradcam_enable: false
+    gradcam_rate_hz: 5.0
+    # What is explained: the predicted actions' distance from "do nothing" over these dims:
+    # motion (dx..drz), position, rotation, gripper or all.
+    gradcam_target: "motion"
+    # Steps of the chunk to explain. 0 = the ones executed from this observation (ACT:
+    # n_action_steps, 10 with temporal ensembling; diffusion: n_action_steps).
+    gradcam_horizon: 0
+    gradcam_topic: "/policy/gradcam/image"

@@ -1,0 +1,46 @@
+# Which checkpoint to load and Diffusion-Policy-specific inference knobs. Not a ROS param file
+# (this policy is loaded in-process by diffusion_policy.py, not launched as its own node), same
+# as policies/liteflow/config.yaml.
+
+# Mounted read-only from the host (docker-compose.yml's checkpoints volume): the lerobot
+# checkpoint directory holding config.json, model.safetensors and the pre/post-processors.
+# Two checkpoints of the same RGB-only training run (Robot_Friday checkpoints/checkpoint_diffusion):
+#   checkpoint_diffusion_375  step 375k, the final one (formerly fan_grasp_diffusion_v1)
+#   checkpoint_diffusion_50   step 50k: lower validation loss on the 10 held-out episodes
+#                             (0.073 vs 0.141), not yet tried on the robot
+checkpoint_dir: /checkpoints/diffusion/checkpoint_diffusion_375
+# checkpoint_dir: /checkpoints/diffusion/checkpoint_diffusion_50
+
+device: cuda
+
+# Carried through the processor pipeline for parity with training batches; the diffusion policy
+# itself does not condition on language.
+task: "pick up the fan by its handle"
+
+# Overrides config/params.yaml's inference_rate_hz while this policy runs. Each action is the
+# motion recorded between two consecutive camera frames of the training data (labelled fps=30),
+# so ticking at any other rate scales the arm's speed by the same factor: 10 Hz would move it at a
+# third of the demonstrated speed and stretch each 8-action chunk from 0.27 s to 0.8 s open-loop.
+inference_rate_hz: 30.0
+
+# Dummy inferences at startup to pay the first-call cost (CUDA context, cuDNN autotune) before the
+# robot moves: ~226 ms on the first sampler call versus ~62 ms steady state on an RTX 4070 Ti SUPER.
+warmup_iters: 3
+
+# Real-Time Chunking (guided, inference only - see rtc.py), used only by policy_name diffusion_rtc;
+# policy_name diffusion ignores this block and keeps the original synchronous chunking (one ~60 ms
+# stall every n_action_steps ticks). With RTC the next chunk is computed on a background thread while
+# the current one executes, and is guided to continue from the actions that will already have run by
+# the time it is ready, so predict() never stalls and consecutive chunks join without a jump. Same
+# checkpoint, settings above apply to both.
+rtc:
+  # Cap on the guidance strength (lerobot's RTCConfig default). Higher = the new chunk's prefix
+  # sticks closer to the previous chunk, at some cost to how freely it can react.
+  max_guidance_weight: 10.0
+  # How the guidance weight decays after the frozen actions: LINEAR, EXP, ONES or ZEROS
+  # (lerobot's RTCAttentionSchedule; LINEAR is its default).
+  prefix_attention_schedule: LINEAR
+  # Inference delay in control ticks: the actions that execute from the old chunk while the new one
+  # is computed, which are frozen in the guidance. null = measured (the slowest of the last 20
+  # guided inferences, rounded up to ticks): ~93 ms -> 3 ticks at 30 Hz on an RTX 4070 Ti SUPER.
+  inference_delay: null

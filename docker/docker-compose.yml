@@ -1,0 +1,72 @@
+# Requires nvidia-container-toolkit on the host for the GPU reservations
+# below, and Docker Compose v2. Invoked via ../run_docker.sh,
+# or directly with `docker compose -f docker/docker-compose.yml ...` from the repo root.
+#
+# ROS_DOMAIN_ID and CHECKPOINT_DIR can be overridden via a repo-root .env file or
+# `ROS_DOMAIN_ID=1 CHECKPOINT_DIR=/data/ckpt docker compose -f docker/docker-compose.yml up`.
+# run_docker.sh handles both for you. When calling compose directly, note that
+# relative paths here resolve against docker/, not the repo root: pass
+# `--env-file .env` for the root .env, and give CHECKPOINT_DIR as an absolute path.
+#
+# Code is not baked into either image — this repo is mounted in and
+# entrypoint.sh colcon-builds it on every container start, so a `git pull`
+# on the host + a restart always runs whatever's currently checked out.
+# Both services build the same package; only the environment differs (see
+# Dockerfile vs Dockerfile.liteflow), so pick a service by which policy_name
+# you're running, not by editing the command.
+#
+# FASTDDS_BUILTIN_TRANSPORTS=UDPv4 disables Fast DDS shared memory: the container
+# runs as root without the host's /dev/shm, so with SHM it discovers host-side
+# publishers but never receives their messages.
+
+name: ros2_policy_inference
+
+services:
+  policy-inference:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: lerobot_ros2:latest
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ..:/workspace/src/ros2_policy_inference
+      - ${CHECKPOINT_DIR:-../checkpoints}:/checkpoints:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command:
+      ["ros2", "launch", "ros2_policy_inference", "inference.launch.py",
+       "policy_name:=act"]
+
+  policy-inference-liteflow:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.liteflow
+    image: liteflow_ros2:latest
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ..:/workspace/src/ros2_policy_inference
+      # Not :ro like the other service: trust_remote_code's AutoModel.from_pretrained writes
+      # a small dynamic-module cache into hf_cache/modules/ on first load even when offline
+      # (see liteflow_delta_deploy/README_FIRST.md section 3).
+      - ${CHECKPOINT_DIR:-../checkpoints}:/checkpoints
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command:
+      ["ros2", "launch", "ros2_policy_inference", "inference.launch.py",
+       "policy_name:=liteflow"]

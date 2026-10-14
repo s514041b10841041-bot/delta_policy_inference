@@ -1,0 +1,25 @@
+# Runtime for the LiteFlow policy (liteflow_policy.py), installed by Dockerfile.liteflow.
+# Pinned to the liteflow_delta_deploy bundle's tested versions
+# (delta_arm/requirements-device.txt). torch/torchvision are NOT here: Dockerfile.liteflow
+# installs the CUDA-specific wheel first, matching the checkpoint's own training build
+# (torch 2.8.0 / torchvision 0.23.0, cu128).
+#
+# transformers is pinned hard: InternVL3-1B ships its own modeling code via trust_remote_code
+# and does not survive arbitrary transformers versions.
+transformers==4.39.0
+tokenizers==0.15.2
+huggingface_hub==0.36.2
+safetensors==0.8.0
+einops==0.8.2          # imported by InternVL3's modeling_intern_vit.py
+timm==1.0.28           # imported by InternVL3's modeling_intern_vit.py
+numpy==1.26.4
+opencv-python==4.11.0.86
+pillow==12.3.0
+accelerate==1.14.0     # InternVL3Embedder loads the VLM with low_cpu_mem_usage=True, which
+                        # transformers refuses without accelerate.
+pyyaml
+websockets              # unused directly (no wire protocol in-process), but scripts/liteflow_server.py
+                        # imports it at module level and we reuse that module's
+                        # load_model_and_normalizer() rather than forking it
+# peft is only imported for a LoRA checkpoint; this one is a full finetune, so it is left out.
+# flash_attn is optional: without it the embedder logs a warning and uses standard attention.
