@@ -40,7 +40,9 @@ policy_inference_node:
     # Publish a gripper close only after this many consecutive ticks predict one (below
     # gripper_open_threshold); until then the open value is published and fed back. Filters the
     # stray closes that end the IL grasp step early: diffusion_rtc's come in runs of up to 8 ticks
-    # (claude_utility/replay_results, 100k checkpoint). 1 = off (publish every raw close).
+    # (claude_utility/replay_results, 100k checkpoint). Once reached, the close latches: 0.0 is
+    # published on every tick until the next IL hand-off, so a consumer reading only some messages
+    # can't miss it. 1 = latch on the first raw close.
     gripper_debounce_ticks: 8
 
     # IL hand-off: the sim (delta_extension) publishes on this topic when its

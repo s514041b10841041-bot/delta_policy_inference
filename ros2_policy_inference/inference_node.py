@@ -139,8 +139,10 @@ class PolicyInferenceNode(Node):
         if cfg.gripper_debounce_ticks < 1:
             raise ValueError(f"gripper_debounce_ticks must be >= 1, got {cfg.gripper_debounce_ticks}")
         self._gripper_state = 1.0 if cfg.initial_gripper_open else 0.0
-        # Consecutive ticks whose raw action[6] was a close (see _debounce_gripper).
+        # Consecutive ticks whose raw action[6] was a close, and whether the close has latched
+        # (see _debounce_gripper). Both are cleared only at a hand-off reset.
         self._close_ticks = 0
+        self._gripper_latched = False
         # Published-action counter for the gripper trace below (tick 1 = first action).
         self._tick = 0
 
@@ -244,21 +246,34 @@ class PolicyInferenceNode(Node):
             f"gripper trace: tick {self._tick} raw action[6]={raw_gripper:.4f} "
             f"close_ticks={self._close_ticks}/{self.cfg.gripper_debounce_ticks} "
             f"published={action[6]:.4f}"
-            f"{' (stray close filtered)' if action[6] != raw_gripper else ''} "
+            f"{' (latched close)' if self._gripper_latched else ' (stray close filtered)' if action[6] != raw_gripper else ''} "
             f"gripper_state fed in={gripper_state_in:.0f} next={self._gripper_state:.0f}"
         )
 
     def _debounce_gripper(self, action):
         """Count consecutive ticks whose raw action[6] is a close (< gripper_open_threshold); any
         open tick resets the count. Until the count reaches gripper_debounce_ticks, action[6] is
-        replaced by the open value 1.0, so no consumer sees the close; from then on the raw close
-        is published for as long as it lasts (the count only has to reach N once). With
-        gripper_debounce_ticks=1 every action passes through unchanged."""
+        replaced by the open value 1.0, so no consumer sees the close. When it reaches N the close
+        LATCHES: from then on action[6] is published as 0.0 on every tick, whatever the raw value,
+        until the next hand-off reset. A consumer that reads only some of the messages (the
+        extension at its frame rate) then cannot miss a short close burst. 0.0 rather than the raw
+        value: after the latch the raw value can rise back above the threshold, and the training
+        data's gripper is exactly 0 / 1. gripper_debounce_ticks=1 latches on the first raw close.
+        The count keeps following the raw value after the latch (logged only)."""
         if action[6] < self.cfg.gripper_open_threshold:
             self._close_ticks += 1
         else:
             self._close_ticks = 0
-        if 0 < self._close_ticks < self.cfg.gripper_debounce_ticks:
+        if not self._gripper_latched and self._close_ticks >= self.cfg.gripper_debounce_ticks:
+            self._gripper_latched = True
+            self.get_logger().info(
+                f"gripper close LATCHED at tick {self._tick + 1}: {self._close_ticks} consecutive raw closes "
+                f"(raw action[6]={action[6]:.4f}); publishing 0.0 on every tick until the next hand-off"
+            )
+        if self._gripper_latched:
+            action = action.copy()
+            action[6] = 0.0
+        elif self._close_ticks > 0:
             action = action.copy()
             action[6] = 1.0
         return action
@@ -347,11 +362,12 @@ class PolicyInferenceNode(Node):
             if self.gradcam is not None:
                 self.gradcam.reset()
             self._gripper_state = 1.0 if self.cfg.initial_gripper_open else 0.0
+            was_latched, self._gripper_latched = self._gripper_latched, False
             self._close_ticks = 0
             self.get_logger().info(
                 f"IL hand-off #{handoff_id}: reset_on_handoff -> policy.reset(), "
                 f"_gripper_state {self._handoff['gripper_state_before']:.0f} -> {self._gripper_state:.0f}, "
-                f"gripper debounce count -> 0"
+                f"gripper debounce count -> 0, latch {'cleared' if was_latched else 'was not set'}"
             )
         else:
             self.get_logger().info(f"IL hand-off #{handoff_id}: reset_on_handoff is off, policy state carried over")

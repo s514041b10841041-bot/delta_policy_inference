@@ -149,7 +149,7 @@ grasp is good. The bag is not in git; copy `bags/` over like the checkpoints.
    demonstrations started.
 6. **Hand-off:** when the extension starts its IL step (after the coarse approach), the node logs
    `IL hand-off #s1: new /il/grasp/action subscriber delta_extension_node` and resets the policy,
-   the fed-back gripper state and the gripper debounce. The node detects the IL step's subscription
+   the fed-back gripper state and the gripper debounce and latch. The node detects the IL step's subscription
    itself, so this works with any delta_extension version, no extension change needed. If the line
    doesn't appear when the fine approach starts, stop the run.
    > **Known limit** (Per Frame check in Isaac Sim, 2026-10-14, extension as on origin/main): the
