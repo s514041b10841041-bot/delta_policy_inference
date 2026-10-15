@@ -38,7 +38,7 @@ ros2_policy_inference/
 ├── launch/                  # ros2 launch file (policy_name:=, checkpoint:=)
 ├── docker/                  # Dockerfiles, docker-compose.yml, entrypoint (builds the package)
 ├── docs/                    # README_details.md: the full reference
-├── checkpoints/   (not in git, ~4 GB)  # model weights, mounted at /checkpoints in the container
+├── checkpoints/   (not in git, ~6 GB)  # model weights, mounted at /checkpoints in the container
 └── bags/          (not in git, ~2 GB)  # recorded robot topics for testing without the robot
 ```
 
@@ -81,18 +81,23 @@ printf '%s' 'glpat-...' > ~/.gitlab_token && chmod 600 ~/.gitlab_token
 docker compose -f docker/docker-compose.yml build policy-inference
 ```
 
-**5. The checkpoints.** They are not in git. Copy the `checkpoints/` folder from the training PC
-into this folder, then check that the copy is complete:
+**5. The checkpoints.** They are not in git; download them (~6 GB, public, no login needed) from
+Hugging Face, [ArthurGoldFishKing/delta_all_policy](https://huggingface.co/ArthurGoldFishKing/delta_all_policy),
+into this folder, then check that the download is complete:
 ```bash
+pip install -U huggingface_hub                  # provides the hf command (or: pipx install huggingface_hub)
+hf download ArthurGoldFishKing/delta_all_policy --local-dir checkpoints
 cd checkpoints && sha256sum -c SHA256SUMS && cd ..     # every line must say OK
 ```
 ```text
 checkpoints/
 ├── act/checkpoint_act_375/
-├── diffusion/checkpoint_diffusion_375/        # RGB only
+├── act_depth/checkpoint_act_375/                 # RGB + depth
+├── diffusion/checkpoint_diffusion_375/           # RGB only
 ├── diffusion/checkpoint_diffusion_50/
-├── diffusion_depth/checkpoint_diffusion_375/  # RGB + depth
-└── diffusion_depth/checkpoint_diffusion_50/
+├── diffusion_depth/checkpoint_diffusion_375/     # RGB + depth
+├── diffusion_depth/checkpoint_diffusion_50/
+└── diffusion_depth_only/checkpoint_diffusion_10/ # depth only
 ```
 
 **6. Test the install without a robot:**
@@ -127,7 +132,7 @@ docker run --rm -it --network host --entrypoint bash \
 ```
 It works if terminal 1 logs `action: [...]` about 30 times per second. The bag was recorded
 during fan *insertion*, not grasping, so this only proves the pipeline runs, not that the
-grasp is good. The bag is not in git; copy `bags/` over like the checkpoints.
+grasp is good. The bag is not in git or on Hugging Face; copy `bags/` over from the training PC.
 
 ### 2b. With the real robot's observations
 
