@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Auto-pulls the environment image from the GitLab Package Registry if it
 # isn't already present locally (and, for liteflow, fetches its checkpoint
-# if missing too), then runs docker compose.
+# if missing too — pi's checkpoint comes from Hugging Face instead, see README),
+# then runs docker compose.
 #
 # --policy-name picks which policy to launch and, from that, which image:
 # liteflow runs in its own image (ROS2 + CUDA + InternVL3/FLOWER — see

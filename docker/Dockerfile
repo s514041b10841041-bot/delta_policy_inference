@@ -22,12 +22,13 @@ SHELL ["/bin/bash", "-c"]
 # verified in (conda lerobot312): lerobot 0.6.2, which is not on PyPI, so it
 # is installed from the same GitHub commit, plus torch 2.11.0 / CUDA 13.0
 # (needs NVIDIA driver >= 580). [diffusion] pulls in diffusers, which
-# DiffusionPolicy imports. The checkpoint needs lerobot >= 0.6: older
+# DiffusionPolicy imports; [pi] and the transformers pin are for the pi05
+# policy (from upstream). The checkpoint needs lerobot >= 0.6: older
 # versions reject fields in its config.json.
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
 ARG TORCH_VERSION=2.11.0
 ARG TORCHVISION_VERSION=0.26.0
-ARG LEROBOT_SPEC="lerobot[diffusion] @ git+https://github.com/huggingface/lerobot.git@30074f7f1358b3c015ae1750017200e86e9c4eb6"
+ARG LEROBOT_SPEC="lerobot[diffusion,pi] @ git+https://github.com/huggingface/lerobot.git@30074f7f1358b3c015ae1750017200e86e9c4eb6"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1
@@ -59,6 +60,7 @@ RUN pip install --no-cache-dir \
     && pip install --no-cache-dir \
         --extra-index-url ${TORCH_INDEX_URL} \
         "${LEROBOT_SPEC}" \
+        "transformers>=5.4.0,<5.6.0" \
         torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} \
         scipy
 

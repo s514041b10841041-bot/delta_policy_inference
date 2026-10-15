@@ -1,0 +1,12 @@
+# π₀.₅ checkpoint + inference knobs, read by pi_policy.py. Paths are inside the container
+# (checkpoints/ is mounted at /checkpoints).
+ckpt_path: "/checkpoints/pi05_grasp_fan_depth_97"
+task: "grasp the fan"
+depth_info_path: "/checkpoints/pi05_grasp_fan_depth_97/depth_info.json"
+state_keys: [joint_pos, gripper_state]
+
+# Optional (unset = checkpoint default / auto):
+# device: "cuda"
+# n_action_steps: 10
+# num_inference_steps: 10
+# warmup: true

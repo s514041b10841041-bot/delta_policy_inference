@@ -90,7 +90,7 @@ def create_policy(name: str, checkpoint: str = "") -> PolicyModel:
         from .dummy_policy import DummyPolicyModel
         return DummyPolicyModel()
     if name == "pi":
-        from .pi_policy import PIPolicyModel
+        from .pi.pi_policy import PIPolicyModel
         return PIPolicyModel()
     if name == "liteflow":
         from .liteflow.liteflow_policy import LiteFlowPolicyModel

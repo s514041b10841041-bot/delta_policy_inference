@@ -219,6 +219,14 @@ class PolicyInferenceNode(Node):
             )
             return
 
+        health = self.bridge.check_health(self.cfg.topic_timeout_sec)
+        if any(status != "ok" for status in health.values()):
+            self.get_logger().warn(
+                "observation data is stale, skipping inference tick",
+                throttle_duration_sec=5.0,
+            )
+            return
+
         obs = self._build_obs(ros_data)
         gripper_state_in = self._gripper_state
         action = np.asarray(self.policy.predict(obs), dtype=np.float64)

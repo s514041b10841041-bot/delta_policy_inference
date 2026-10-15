@@ -316,7 +316,16 @@ you can see how much they rely on RGB vs depth. The bottom line shows the motion
 | `act` | LeRobot ACT, RGB camera | `act/checkpoint_act_375` |
 | `depth_act` | LeRobot ACT, RGB **+ depth** camera | `act_depth/checkpoint_act_375` |
 | `liteflow` | InternVL3-1B + FLOWER (own image, weights downloaded automatically) | — |
+| `pi` | π₀.₅ (pi05) LeRobot checkpoint, from upstream; needs the image rebuilt (below) | `pi05_grasp_fan_depth_97` |
 | `dummy` | outputs nothing useful; for testing the topics | — |
+
+`pi`'s checkpoint is hosted on Hugging Face, not in this repo:
+```bash
+hf download <hf_repo_id> --local-dir checkpoints/pi05_grasp_fan_depth_97
+```
+(`ckpt_path` in `policies/pi/config.yaml` points at `/checkpoints/pi05_grasp_fan_depth_97`). It needs
+`transformers`, which the `lerobot_ros2` image only has once rebuilt from the current
+`docker/Dockerfile` (`lerobot[diffusion,pi]`).
 
 `--checkpoint` picks another checkpoint from that policy's folder:
 
