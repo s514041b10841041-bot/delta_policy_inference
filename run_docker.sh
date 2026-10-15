@@ -5,7 +5,7 @@
 #
 # --policy-name picks which policy to launch and, from that, which image:
 # liteflow runs in its own image (ROS2 + CUDA + InternVL3/FLOWER — see
-# Dockerfile.liteflow), everything else (act/depth_act/pi/dummy/diffusion/diffusion_rtc/depth_inference) in the shared
+# Dockerfile.liteflow), everything else (act/depth_act/pi/dummy/diffusion*/depth_inference*/diffusion_depth_only*) in the shared
 # lerobot one. Either way, code is mounted in and colcon-built fresh by
 # entrypoint.sh on every container start, so pulling an older image is
 # fine as long as its Dockerfile hasn't changed. Rebuild the image
@@ -26,7 +26,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 usage() {
-    echo "Usage: $0 --policy-name <dummy|act|depth_act|pi|liteflow|diffusion|diffusion_rtc|depth_inference|depth_inference_rtc>" \
+    echo "Usage: $0 --policy-name <dummy|act|depth_act|pi|liteflow|diffusion|diffusion_rtc|depth_inference|depth_inference_rtc|diffusion_depth_only|diffusion_depth_only_rtc>" \
          "[--checkpoint <name>] [--gradcam] [command...]" >&2
     exit 1
 }

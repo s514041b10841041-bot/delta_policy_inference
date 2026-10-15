@@ -41,7 +41,7 @@ _DEFAULT_PARAMS = dict(
     action_topic="/il/grasp/action",
     # Which policies/*.py implementation to run — see policies/__init__.py.
     policy_name="dummy",
-    # Checkpoint override for act / depth_act / diffusion* / depth_inference*: "" = the policy's config.yaml
+    # Checkpoint override for act / depth_act / diffusion* / depth_inference* / diffusion_depth_only*: "" = the policy's config.yaml
     # checkpoint_dir; otherwise a folder name such as diffusion_50k (policies.resolve_checkpoint).
     checkpoint="",
     inference_rate_hz=10.0,

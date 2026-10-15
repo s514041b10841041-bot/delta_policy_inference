@@ -16,7 +16,7 @@ def generate_launch_description():
         DeclareLaunchArgument("policy_name", default_value="dummy"),
         DeclareLaunchArgument(
             "checkpoint", default_value="",
-            description="Checkpoint folder for act/depth_act/diffusion*/depth_inference*, e.g. diffusion_50k; "
+            description="Checkpoint folder for act/depth_act/diffusion*/depth_inference*/diffusion_depth_only*, e.g. diffusion_50k; "
                         "empty = the policy's config.yaml checkpoint_dir"),
         DeclareLaunchArgument(
             "reset_on_handoff", default_value="true",

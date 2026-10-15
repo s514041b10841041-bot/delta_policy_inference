@@ -83,6 +83,9 @@ class DiffusionPolicyModel(PolicyModel):
         # observation.images.wrist_depth, filled by _extra_images()), else the first image feature.
         self._image_key = ("observation.images.wrist" if "observation.images.wrist" in cfg.image_features
                            else next(iter(cfg.image_features), "observation.images.wrist"))
+        # A depth-only checkpoint (policies/diffusion_depth_only) has no RGB input at all: its only
+        # image is observation.images.wrist_depth, filled by _extra_images(), so obs["rgb"] is unused.
+        self._uses_rgb = self._image_key != "observation.images.wrist_depth"
         self._state_dim = cfg.input_features["observation.state"].shape[0]
 
         # rtc overrides config.yaml's rtc settings (tests); use_rtc decides whether RTC runs at all.
@@ -261,11 +264,13 @@ class DiffusionPolicyModel(PolicyModel):
         ft_wrench are deliberately ignored.
         """
         torch = self._torch
-        rgb = obs["rgb"]                                   # HWC uint8 RGB, already image_size square
-        if rgb.dtype != np.uint8:
-            raise ValueError(f"obs['rgb'] must be uint8, got {rgb.dtype}")
-        img = torch.from_numpy(np.ascontiguousarray(rgb)).to(self.device)
-        img = img.permute(2, 0, 1).float().div_(255.0).unsqueeze(0)   # HWC uint8 -> 1CHW float [0,1]
+        images = {}
+        if self._uses_rgb:
+            rgb = obs["rgb"]                               # HWC uint8 RGB, already image_size square
+            if rgb.dtype != np.uint8:
+                raise ValueError(f"obs['rgb'] must be uint8, got {rgb.dtype}")
+            img = torch.from_numpy(np.ascontiguousarray(rgb)).to(self.device)
+            images[self._image_key] = img.permute(2, 0, 1).float().div_(255.0).unsqueeze(0)  # 1CHW [0,1]
 
         joint_pos = np.asarray(obs["joint_pos"], dtype=np.float32).reshape(-1)
         state = np.concatenate([joint_pos, [np.float32(obs["gripper_state"])]]).astype(np.float32)
@@ -275,7 +280,7 @@ class DiffusionPolicyModel(PolicyModel):
                 f"checkpoint expects {self._state_dim}"
             )
         return {
-            self._image_key: img,
+            **images,
             **self._extra_images(obs),
             "observation.state": torch.from_numpy(state).to(self.device).unsqueeze(0),
             # Carried through for parity with training batches; the diffusion policy itself does not

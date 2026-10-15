@@ -37,6 +37,8 @@ Every way of running the node takes **one policy name**; nothing else needs edit
 | `depth_inference` | Diffusion Policy trained on wrist RGB **+ depth**, not yet tried on the robot | `lerobot_ros2` | 30 Hz | `checkpoints/diffusion_depth/checkpoint_diffusion_375` |
 | `depth_inference_rtc` | same depth model + guided Real-Time Chunking | `lerobot_ros2` | 30 Hz | same as `depth_inference` |
 | `depth_act` | ACT trained on wrist RGB **+ depth**, not yet tried on the robot | `lerobot_ros2` | 30 Hz | `checkpoints/act_depth/checkpoint_act_375` |
+| `diffusion_depth_only` | Diffusion Policy trained on wrist **depth only** (no RGB), 10k steps, not yet tried on the robot | `lerobot_ros2` | 30 Hz | `checkpoints/diffusion_depth_only/checkpoint_diffusion_10` |
+| `diffusion_depth_only_rtc` | same depth-only model + guided Real-Time Chunking | `lerobot_ros2` | 30 Hz | same as `diffusion_depth_only` |
 | `liteflow` | InternVL3-1B + FLOWER, working | `liteflow_ros2` | 10 Hz | `checkpoints/liteflow/...` (auto-fetched) |
 | `pi` | not implemented | `lerobot_ros2` | 10 Hz | — |
 
@@ -81,7 +83,7 @@ nodes running at once interleave their actions.
 Requires [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
 ```bash
-./run_docker.sh --policy-name act          # or: depth_act, diffusion, diffusion_rtc, depth_inference, depth_inference_rtc, liteflow, dummy
+./run_docker.sh --policy-name act          # or: depth_act, diffusion, diffusion_rtc, depth_inference, depth_inference_rtc, diffusion_depth_only, diffusion_depth_only_rtc, liteflow, dummy
 ./run_docker.sh --policy-name diffusion_rtc --checkpoint diffusion_50k   # another checkpoint of that policy
 ./run_docker.sh --policy-name act bash     # shell in the container instead of launching
 ```
@@ -116,6 +118,7 @@ Set `CHECKPOINT_DIR` in the environment or a repo-root `.env` to use another fol
 | `act` | `checkpoints/act/checkpoint_act_375` | copy `Robot_Friday/checkpoints/checkpoint_act/375000/pretrained_model/` |
 | `depth_inference` | `checkpoints/diffusion_depth/checkpoint_diffusion_375` (or `_50`) | `Robot_Friday/checkpoints/checkpoint_diffusion_depth/{375000,050000}/pretrained_model/`, plus `Robot_Friday/data/lerobot_data_depth/meta/depth_encoding.json` (checked at startup) |
 | `depth_act` | `checkpoints/act_depth/checkpoint_act_375` | `Robot_Friday/checkpoints/checkpoint_act_depth/375000/pretrained_model/`, plus `Robot_Friday/data/lerobot_data_depth/meta/depth_encoding.json` (checked at startup) |
+| `diffusion_depth_only` | `checkpoints/diffusion_depth_only/checkpoint_diffusion_10` | `Robot_Friday/checkpoints/checkpoint_depth_only_diffusion/010000/pretrained_model/`, plus `Robot_Friday/data/lerobot_data_depth/meta/depth_encoding.json` (checked at startup) |
 
 Each policy's checkpoint path and inference knobs are in `policies/<name>/config.yaml`.
 
@@ -134,7 +137,7 @@ Requires ROS 2 Jazzy and the policy's dependencies (for `act`/`diffusion`: torch
 source /opt/ros/jazzy/setup.bash
 colcon build --packages-select ros2_policy_inference
 source install/setup.bash
-ros2 launch ros2_policy_inference inference.launch.py policy_name:=act   # or: depth_act, diffusion, diffusion_rtc, depth_inference, depth_inference_rtc, liteflow, dummy
+ros2 launch ros2_policy_inference inference.launch.py policy_name:=act   # or: depth_act, diffusion, diffusion_rtc, depth_inference, depth_inference_rtc, diffusion_depth_only, diffusion_depth_only_rtc, liteflow, dummy
 ros2 launch ros2_policy_inference inference.launch.py policy_name:=diffusion_rtc checkpoint:=diffusion_50k
 ```
 

@@ -13,7 +13,7 @@ policy_inference_node:
     # Which policies/*.py implementation to run
     policy_name: "dummy"
 
-    # Checkpoint for act / depth_act / diffusion* / depth_inference*: "" = the one in the policy's
+    # Checkpoint for act / depth_act / diffusion* / depth_inference* / diffusion_depth_only*: "" = the one in the policy's
     # config.yaml; otherwise a folder name, e.g. diffusion_50k or checkpoint_diffusion_50.
     # Override at launch: `ros2 launch ... checkpoint:=diffusion_50k`.
     checkpoint: ""

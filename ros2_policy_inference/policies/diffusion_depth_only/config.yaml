@@ -1,0 +1,15 @@
+# Diffusion Policy trained on the wrist DEPTH image + the 7-D state only, no RGB (Robot_Friday
+# baselines/run_depth_only_diffusion.sh, checkpoints/checkpoint_depth_only_diffusion). Same backend,
+# rate, warm-up and RTC settings as policies/diffusion/config.yaml (used by depth_only_policy.py);
+# this file only adds the checkpoint and the depth encoding.
+
+# The run's <step>/pretrained_model/ plus data/lerobot_data_depth/meta/depth_encoding.json:
+#   checkpoint_diffusion_10   step 10k, the final one (10k-step run, cosine LR to zero; trained on
+#                             all 97 episodes, so there is no held-out validation loss)
+checkpoint_dir: /checkpoints/diffusion_depth_only/checkpoint_diffusion_10
+
+# Must equal the dataset's meta/depth_encoding.json (depth_min_m / depth_max_m), as in
+# policies/depth_inference/config.yaml: depth in [depth_min_m, depth_max_m] maps linearly to 255
+# (near) ... 1 (far), farther is clipped to 1, and 0 means no reading.
+depth_min_m: 0.0
+depth_max_m: 1.0

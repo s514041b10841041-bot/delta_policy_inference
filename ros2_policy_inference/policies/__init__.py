@@ -12,7 +12,7 @@ import os
 from .base_policy import PolicyModel
 
 _OPTIONS = ("dummy, act, depth_act, pi, liteflow, diffusion, diffusion_rtc, depth_inference, "
-            "depth_inference_rtc")
+            "depth_inference_rtc, diffusion_depth_only, diffusion_depth_only_rtc")
 
 
 def resolve_checkpoint(name: str, default: str) -> str:
@@ -73,12 +73,19 @@ def create_policy(name: str, checkpoint: str = "") -> PolicyModel:
         return depth_policy.DiffusionDepthPolicyModel(
             checkpoint_path=resolve_checkpoint(checkpoint, depth_policy._CFG["checkpoint_dir"]),
             use_rtc=(name == "depth_inference_rtc"))
+    if name in ("diffusion_depth_only", "diffusion_depth_only_rtc"):
+        # Diffusion checkpoint trained on the wrist depth image as its only camera, no RGB
+        # (policies/diffusion_depth_only); same backend and chunking choice as diffusion / diffusion_rtc.
+        from .diffusion_depth_only import depth_only_policy
+        return depth_only_policy.DiffusionDepthOnlyPolicyModel(
+            checkpoint_path=resolve_checkpoint(checkpoint, depth_only_policy._CFG["checkpoint_dir"]),
+            use_rtc=(name == "diffusion_depth_only_rtc"))
 
     if name not in ("dummy", "pi", "liteflow"):
         raise ValueError(f"unknown policy_name '{name}' (options: {_OPTIONS})")
     if checkpoint:
         raise ValueError(f"policy_name '{name}' does not take a checkpoint (only act, depth_act, "
-                         f"diffusion*, depth_inference* do); drop --checkpoint")
+                         f"diffusion*, depth_inference*, diffusion_depth_only* do); drop --checkpoint")
     if name == "dummy":
         from .dummy_policy import DummyPolicyModel
         return DummyPolicyModel()

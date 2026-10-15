@@ -87,3 +87,6 @@ class DiffusionDepthPolicyModel(DepthInputMixin, DiffusionPolicyModel):
         self._setup_depth(checkpoint_path, _CFG["depth_min_m"], _CFG["depth_max_m"])
         super().__init__(checkpoint_path=checkpoint_path, use_rtc=use_rtc, **kwargs)
         self._check_depth_checkpoint(checkpoint_path, "diffusion")
+        if not self._uses_rgb:
+            raise ValueError(f"{checkpoint_path} has no RGB input (depth only); "
+                             f"use policy_name diffusion_depth_only")

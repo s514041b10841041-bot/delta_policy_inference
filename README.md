@@ -29,6 +29,7 @@ ros2_policy_inference/
 │   └── policies/            #   one folder per policy, each with its own config.yaml (checkpoint path, settings)
 │       ├── diffusion/       #     Diffusion Policy (+ rtc.py, smooth chunking)
 │       ├── depth_inference/ #     the same + depth image input
+│       ├── diffusion_depth_only/ #  the same with depth image input only (no RGB)
 │       ├── act/             #     ACT
 │       ├── act_depth/       #     ACT + depth image input
 │       ├── liteflow/        #     InternVL3 + FLOWER
@@ -165,12 +166,18 @@ Two policies were trained on the wrist **RGB image + depth image**:
 - `depth_inference_rtc`: the Diffusion Policy.
 - `depth_act`: ACT.
 
+A third was trained on the wrist **depth image only** (no RGB):
+
+- `diffusion_depth_only_rtc`: the Diffusion Policy. A short 10k-step run on all 97 demonstrations,
+  so there is no held-out validation loss for it.
+
 The RGB-only `diffusion_rtc` and `act` stay as they were, so you can switch between them to compare.
 
 ```bash
 ./run_docker.sh --policy-name depth_inference_rtc --checkpoint diffusion_50k   # depth diffusion, 50k (best val loss)
 ./run_docker.sh --policy-name depth_inference_rtc                              # depth diffusion, 375k (default)
 ./run_docker.sh --policy-name depth_act                                        # depth ACT, 375k (the only one)
+./run_docker.sh --policy-name diffusion_depth_only_rtc                         # depth-only diffusion, 10k (the only one)
 ```
 
 Everything else is the same as above: the robot ([2](#2-run-on-the-real-robot)) and the bag test
@@ -183,7 +190,10 @@ loaded diffusion from /checkpoints/diffusion_depth/checkpoint_diffusion_50 ...
 warmed up with 3 unguided + 3 guided inferences ...
 depth input observation.images.wrist_depth: 0-1 m -> 255-1, no reading -> 0
 ```
-For `depth_act` the first line is `loaded act from /checkpoints/act_depth/checkpoint_act_375 ...`.
+For `depth_act` the first line is `loaded act from /checkpoints/act_depth/checkpoint_act_375 ...`,
+for `diffusion_depth_only_rtc` it is
+`loaded diffusion from /checkpoints/diffusion_depth_only/checkpoint_diffusion_10 ... image key observation.images.wrist_depth ...`.
+The depth-only policy ignores the RGB image, but the node still waits for the RGB topic like the others.
 
 **How depth reaches the model.** The node turns each depth frame into the same image the model was
 trained on:
@@ -192,7 +202,8 @@ trained on:
 - otherwise brightness goes from 255 at 0 m down to 1 at 1 m, and anything farther is 1;
 - the value is repeated in 3 channels.
 
-The range is set in `policies/depth_inference/config.yaml` and `policies/act_depth/config.yaml`
+The range is set in `policies/depth_inference/config.yaml`, `policies/diffusion_depth_only/config.yaml`
+and `policies/act_depth/config.yaml`
 (`depth_min_m`, `depth_max_m`). It must
 match the training data. At startup the node compares it with `depth_encoding.json` in the
 checkpoint folder and stops if they differ.
@@ -202,6 +213,8 @@ is Robot_Friday `data/lerobot_data_depth`.
 
 - `checkpoints/diffusion_depth/checkpoint_diffusion_{50,375}/`, from Robot_Friday
   `checkpoints/checkpoint_diffusion_depth/{050000,375000}/pretrained_model/`.
+- `checkpoints/diffusion_depth_only/checkpoint_diffusion_10/`, from Robot_Friday
+  `checkpoints/checkpoint_depth_only_diffusion/010000/pretrained_model/`.
 - `checkpoints/act_depth/checkpoint_act_375/`, from Robot_Friday
   `checkpoints/checkpoint_act_depth/375000/pretrained_model/`.
 
@@ -259,6 +272,8 @@ you can see how much they rely on RGB vs depth. The bottom line shows the motion
 | `diffusion` | same model without smooth chunking (pauses ~60 ms every 8 actions) | same |
 | `depth_inference_rtc` | Diffusion Policy, RGB **+ depth** camera | `diffusion_depth/checkpoint_diffusion_375` |
 | `depth_inference` | same without smooth chunking | same |
+| `diffusion_depth_only_rtc` | Diffusion Policy, **depth camera only** (no RGB) | `diffusion_depth_only/checkpoint_diffusion_10` |
+| `diffusion_depth_only` | same without smooth chunking | same |
 | `act` | LeRobot ACT, RGB camera | `act/checkpoint_act_375` |
 | `depth_act` | LeRobot ACT, RGB **+ depth** camera | `act_depth/checkpoint_act_375` |
 | `liteflow` | InternVL3-1B + FLOWER (own image, weights downloaded automatically) | — |
@@ -287,5 +302,5 @@ Run only **one** policy at a time. All of them publish on the same topic. Stop o
 | `could not select device driver "nvidia"` | NVIDIA Container Toolkit missing (install step 3) |
 | `permission denied ... docker.sock` | not in the `docker` group (install step 2, then log out and back in) |
 | `No GitLab token found` | save a token (install step 4a) or build the image (4b) |
-| `obs['depth'] missing` | `depth_inference*` and `depth_act` need `/camera_L/depth/aligned_depth_to_color` |
+| `obs['depth'] missing` | `depth_inference*`, `diffusion_depth_only*` and `depth_act` need `/camera_L/depth/aligned_depth_to_color` |
 | `ros2: command not found` on the host | expected: ROS is only inside the container. Use the commands above |
